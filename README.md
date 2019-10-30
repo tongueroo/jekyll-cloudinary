@@ -3,7 +3,7 @@
 [![Gem Version](https://badge.fury.io/rb/jekyll-cloudinary.svg)](https://badge.fury.io/rb/jekyll-cloudinary)
 [![Gem Downloads](https://img.shields.io/gem/dt/jekyll-cloudinary.svg?style=flat)](http://rubygems.org/gems/jekyll-cloudinary)
 
-`jekyll-cloudinary` is a [Jekyll](http://jekyllrb.com/) plugin adding a [Liquid](http://liquidmarkup.org) tag to ease the use of [Cloudinary](http://cloudinary.com/invites/lpov9zyyucivvxsnalc5/sgyyc0j14k6p0sbt51nw) for responsive images in your Markdown/[Kramdown](http://kramdown.gettalong.org/) posts.
+`jekyll-cloudinary` is a [Jekyll](http://jekyllrb.com/) plugin adding a [Liquid](http://liquidmarkup.org) tag to ease the use of [Cloudinary](https://nho.io/cloudinary-signup) for responsive images in your Markdown/[Kramdown](http://kramdown.gettalong.org/) posts.
 
 It builds the HTML for responsive images in the posts, using the `srcset` and `sizes` attributes for the `<img />` tag (see [the "varying size and density" section of this post](https://jakearchibald.com/2015/anatomy-of-responsive-images/#varying-size-and-density) if this is new for you, and why it's recommended to [not use `<picture>` most of the time](https://cloudfour.com/thinks/dont-use-picture-most-of-the-time/)). URLs in the `srcset` are cloudinary URLs that [fetch on-the-fly](http://cloudinary.com/features#fetch) the post's images and resize them to several sizes.
 
@@ -11,11 +11,11 @@ You are in full control of the number of generated images and their sizes, and t
 
 Here is the general syntax of this Liquid tag:
 
-{% raw %}
-```markdown
-{% cloudinary cloudflare.png alt="Un schéma montrant l'apport de Cloudflare" caption="Un schéma montrant l'apport de Cloudflare" %}
+<!-- {% raw %} -->
+```liquid
+{% cloudinary cloudflare.png alt="Un schéma montrant l'apport de Cloudflare" caption="Un schéma montrant l'apport de Cloudflare" loading="lazy" %}
 ```
-{% endraw %}
+<!-- {% endraw %} -->
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -25,7 +25,9 @@ Here is the general syntax of this Liquid tag:
 - [Configuration](#configuration)
   - [Mandatory settings](#mandatory-settings)
   - [Optional global settings](#optional-global-settings)
+    - [`only_prod` (default: `false`)](#only_prod-default-false)
     - [`verbose` (default: `false`)](#verbose-default-false)
+    - [`origin_url`](#origin_url)
   - [Optional (but highly recommended) presets](#optional-but-highly-recommended-presets)
     - [Default preset](#default-preset)
     - [Additional presets](#additional-presets)
@@ -37,15 +39,20 @@ Here is the general syntax of this Liquid tag:
     - [`steps` (default: `5`)](#steps-default-5)
     - [`sizes` (default: `"100vw"`)](#sizes-default-100vw)
     - [`attributes` (default: none)](#attributes-default-none)
+- [Liquid tag values](#liquid-tag-values)
+- [Liquid tag attributes](#liquid-tag-attributes)
+  - [Recommended attributes](#recommended-attributes)
+  - [Loading attribute](#loading-attribute)
+  - [Other interesting attributes](#other-interesting-attributes)
 - [Live example](#live-example)
-- [To do](#to-do)
+- [Contributing](#contributing)
 - [Do you use the plugin on a live site?](#do-you-use-the-plugin-on-a-live-site)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## Installation
 
-[Sign up **for free** on Cloudinary!](http://cloudinary.com/invites/lpov9zyyucivvxsnalc5/sgyyc0j14k6p0sbt51nw) The free account should be enough for most blogs.
+[Sign up **for free** on Cloudinary!](https://nho.io/cloudinary-signup) The free account should be enough for most blogs.
 
 Add `gem 'jekyll-cloudinary'` to the `jekyll_plugin` group in your `Gemfile`:
 
@@ -59,7 +66,7 @@ group :jekyll_plugins do
 end
 ```
 
-Then run `bundle update` to install the gem.
+Then run `bundle` to install the gem.
 
 ## Configuration
 
@@ -79,8 +86,23 @@ You can now define some global settings
 ```yaml
 cloudinary:
   …
+  only_prod: true
   verbose: true
+  origin_url: https://another-domain.com
 ```
+
+#### `only_prod` (default: `false`)
+
+When set to `true`, this setting implies that responsive image HTML and Cloudinary URLs are generated only if the environnement is `production`.
+
+For example:
+
+- if you run `JEKYLL_ENV=production bundle exec jekyll build`, you'll get the code to deploy, with `srcset` and Cloudinary URLs.
+- if you run `JEKYLL_ENV=development bundle exec jekyll serve`, you'll get code for local development, with standard `<img src="…">` code and local URLs.
+
+[`JEKYLL_ENV=development` is the default value](https://jekyllrb.com/docs/configuration/#specifying-a-jekyll-environment-at-build-time).
+
+If you don't set `only_prod` or set it to `false`, responsive image HTML and Cloudinary URLs are always generated, whatever the environment. jekyll-cloudinary had only this behavior before version 1.11.0.
 
 #### `verbose` (default: `false`)
 
@@ -95,6 +117,12 @@ or
 ```
 [Cloudinary] Natural width of source image 'img.jpg' (720px) in _posts/2016-06-09-post.md not enough for creating 1600px version
 ```
+
+#### `origin_url`
+
+When `origin_url` is set, jekyll-cloudinary will use this URL rather than `site.url` as origin of the source images.
+
+This allows you to store your source image on a different domain than your website.
 
 ### Optional (but highly recommended) presets
 
@@ -120,11 +148,11 @@ This preset will generate five images 320 to 1600 pixels wide in the `srcset` an
 
 With this preset, you only have to write this in your Markdown post:
 
-{% raw %}
-```markdown
+<!-- {% raw %} -->
+```liquid
 {% cloudinary /assets/img.jpg alt="beautiful!" %}
 ```
-{% endraw %}
+<!-- {% endraw %} -->
 
 To get this HTML:
 
@@ -166,15 +194,16 @@ cloudinary:
       sizes: "(min-width: 50rem) 17rem, 30vw"
       attributes:
         class: "one3rd"
+        loading: "lazy"
 ```
 
 To use this additional preset, you will have to write this in your Markdown post:
 
-{% raw %}
-```markdown
+<!-- {% raw %} -->
+```liquid
 {% cloudinary onethird /assets/img.jpg %}
 ```
-{% endraw %}
+<!-- {% endraw %} -->
 
 The generated element will also get a `class="one3rd"` that can be useful for example with this CSS:
 
@@ -198,7 +227,7 @@ The value can be:
 - `never`: will always generate a `<img>`, losing the caption
 - `always`: will always generate a `<figure>` and `<figcaption>`, even if there's no `caption` attribute
 
-If a `<figure>` is generated and there are attributes in the Liquid tag, they are added to the `<img>` if they are `alt` or `title`, or to the `<figure>`.
+If a `<figure>` is generated and there are attributes (in the preset or the Liquid tag), they are added to the `<img>` if they are `alt`, `title` or `loading`, or to the `<figure>`.
 
 #### `min_width` (default: `320`)
 
@@ -212,13 +241,62 @@ If a `<figure>` is generated and there are attributes in the Liquid tag, they ar
 
 #### `attributes` (default: none)
 
-Attributes are added without transformation to the generated element.
+You can define attributes that will be added to all images using this preset. Attributes are added without transformation to the generated element.
 
-You can obviously define the `alt` attribute, mandatory for accessibility, but you can also set a `title`, a `class`, `aria-*` attributes for enhanced accessibility, or even `data-*` attributes you would like to use later with CSS or JavaScript.
+You should obviously not add to preset attributes that should have different values for each image, such as `alt`, `caption`, `title`, etc.
 
-The `caption` attribute is the only one that can act differently, depending on the `figure` setting.
+You can set a `class`, `aria-*` attributes for enhanced accessibility, or even `data-*` attributes you would like to use later with CSS or JavaScript.
 
-`alt`, `title` and `caption` attributes can contain Markdown.
+## Liquid tag values
+
+You can use liquid variables inside the liquid tag.
+
+For example, if you have the picture path in a `thumbnail` attribute of the YAML Front Matter, you can use it in the tag:
+
+<!-- {% raw %} -->
+```liquid
+{% cloudinary {{ page.thumbnail }} alt="{{ page.title }} image" %}
+```
+<!-- {% endraw %} -->
+
+## Liquid tag attributes
+
+You can add attributes to the liquid tag, after the image path:
+
+<!-- {% raw %} -->
+```liquid
+{% cloudinary onethird /assets/selfie.jpg alt="My selfie" loading="eager" %}
+```
+<!-- {% endraw %} -->
+
+Just like the ones from the preset settings, inline attributes are added without transformation to the generated element.
+
+### Recommended attributes
+
+You should obviously define the `alt` attribute, mandatory for accessibility.
+
+If you want the image to be inside a `figure` element, you probably also want to add a `caption` attribute. This is the only one that can act differently than other attributes, depending on [the `figure` setting](#figure-default-auto).
+
+You can also set a `title` attribute, but there are really few use cases for it on images.
+
+`alt`, `caption` and `title` attributes can contain Markdown.
+
+### Loading attribute
+
+The `loading` attribute allows you to tell the browser how you want it to load this image.
+
+From [this article written by Addy Osmani](https://addyosmani.com/blog/lazy-loading/):
+
+> The loading attribute allows a browser to defer loading offscreen images and iframes until users scroll near them. loading supports three values:
+> - `lazy`: is a good candidate for lazy loading.
+> - `eager`: is not a good candidate for lazy loading. Load right away.
+> - `auto`: browser will determine whether or not to lazily load.
+> 
+> Not specifying the attribute at all will have the same impact as setting loading=auto.
+
+### Other interesting attributes
+
+You can also use attributes to add a `class`, `aria-*` attributes for enhanced accessibility, or even `data-*` attributes you would like to use later with CSS or JavaScript.
 
 ## Live example
 
@@ -230,7 +308,7 @@ The content is in french, yes, but look only at the images if you don't understa
 
 You'll find here:
 
-- 2 logos floating on the right of the text (or centered on smaller screens): [Jekyll](http://jekyllrb.com/) and [Cloudinary](http://cloudinary.com/invites/lpov9zyyucivvxsnalc5/sgyyc0j14k6p0sbt51nw)
+- 2 logos floating on the right of the text (or centered on smaller screens): [Jekyll](http://jekyllrb.com/) and [Cloudinary](https://nho.io/cloudinary-signup)
 - 2 screenshots taking the whole width of the content: the [Cloudinary pricing table](http://cloudinary.com/pricing), and [Dareboost](https://www.dareboost.com/en/home)'s performance monitoring graph
 
 These image types need different settings to deal with different sizes and position:
@@ -240,12 +318,12 @@ These image types need different settings to deal with different sizes and posit
 
 This is how I use the Cloudinary Liquid tag for the Cloudinary logo and prices table screenshot:
 
-{% raw %}
-```markdown
+<!-- {% raw %} -->
+```liquid
 {% cloudinary logo /assets/logos/cloudinary.png alt="Logo de Cloudinary" %}
 {% cloudinary cloudinary-pricing.png alt="Les tarifs de Cloudinary" caption="Les tarifs de Cloudinary, dont l'offre gratuite déjà généreuse" %}
 ```
-{% endraw %}
+<!-- {% endraw %} -->
 
 The only difference is that I explicitly use the `logo` preset for the logo. The other image uses the `default` preset.
 
@@ -342,9 +420,9 @@ article {
 }
 ```
 
-## To do
+## Contributing
 
-There are already [a few issues for bugs and things that should be added to the plugin](https://github.com/nhoizey/jekyll-cloudinary/issues), feel free to add your ideas!
+Thanks for your interest in contributing! There are many ways to contribute to this project. [Get started here](https://github.com/nhoizey/jekyll-cloudinary/blob/master/CONTRIBUTING.md).
 
 ## Do you use the plugin on a live site?
 

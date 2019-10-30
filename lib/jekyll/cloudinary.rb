@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Jekyll
   module Cloudinary
 
@@ -11,6 +13,11 @@ module Jekyll
 
       def render(context)
         # Default settings
+        settings_defaults = {
+          "cloud_name"         => "",
+          "only_prod"          => false,
+          "verbose"            => false,
+        }
         preset_defaults = {
           "min_width"          => 320,
           "max_width"          => 1200,
@@ -19,7 +26,6 @@ module Jekyll
           "sizes"              => "100vw",
           "figure"             => "auto",
           "attributes"         => {},
-          "verbose"            => false,
           "width_height"       => true,
           # Cloudinary transformations
           "height"             => false,
@@ -48,44 +54,51 @@ module Jekyll
           "page"               => false,
           "density"            => false,
           "flags"              => false,
-          "transformation"     => false
+          "transformation"     => false,
         }
 
         # TODO: Add validation for this parameters
         transformation_options = {
-          "height"             => "h",
-          "crop"               => "c", # can include add-on: imagga_scale
-          "aspect_ratio"       => "ar",
-          "gravity"            => "g",
-          "zoom"               => "z",
-          "x"                  => "x",
-          "y"                  => "y",
-          "fetch_format"       => "f",
-          "quality"            => "q", # can include add-on: jpegmini
-          "radius"             => "r",
-          "angle"              => "a",
-          "effect"             => "e", # can include add-on: viesus_correct
-          "opacity"            => "o",
-          "border"             => "bo",
-          "background"         => "b",
-          "overlay"            => "l",
-          "underlay"           => "u",
-          "default_image"      => "d",
-          "delay"              => "dl",
-          "color"              => "co",
-          "color_space"        => "cs",
-          "dpr"                => "dpr",
-          "page"               => "pg",
-          "density"            => "dn",
-          "flags"              => "fl",
-          "transformation"     => "t"
+          "height"         => "h",
+          "crop"           => "c", # can include add-on: imagga_scale
+          "aspect_ratio"   => "ar",
+          "gravity"        => "g",
+          "zoom"           => "z",
+          "x"              => "x",
+          "y"              => "y",
+          "fetch_format"   => "f",
+          "quality"        => "q", # can include add-on: jpegmini
+          "radius"         => "r",
+          "angle"          => "a",
+          "effect"         => "e", # can include add-on: viesus_correct
+          "opacity"        => "o",
+          "border"         => "bo",
+          "background"     => "b",
+          "overlay"        => "l",
+          "underlay"       => "u",
+          "default_image"  => "d",
+          "delay"          => "dl",
+          "color"          => "co",
+          "color_space"    => "cs",
+          "dpr"            => "dpr",
+          "page"           => "pg",
+          "density"        => "dn",
+          "flags"          => "fl",
+          "transformation" => "t",
         }
 
         # Settings
         site = context.registers[:site]
-        url = site.config["url"]
-        baseurl = site.config["baseurl"] || ""
-        settings = site.config["cloudinary"]
+        site_url = site.config["url"] || ""
+        site_baseurl = site.config["baseurl"] || ""
+        if site.config["cloudinary"].nil?
+          Jekyll.logger.abort_with("[Cloudinary]", "You must set your cloud_name in _config.yml")
+        end
+        settings = settings_defaults.merge(site.config["cloudinary"])
+        if settings["cloud_name"] == ""
+          Jekyll.logger.abort_with("[Cloudinary]", "You must set your cloud_name in _config.yml")
+        end
+        url = settings["origin_url"] || (site_url + site_baseurl)
 
         # Get Markdown converter
         markdown_converter = site.find_converter_instance(::Jekyll::Converters::Markdown)
@@ -103,7 +116,7 @@ module Jekyll
         rendered_markup = Liquid::Template
           .parse(@markup)
           .render(context)
-          .gsub(%r!\\\{\\\{|\\\{\\%!, '\{\{' => '{{', '\{\%' => '{%')
+          .gsub(%r!\\\{\\\{|\\\{\\%!, '\{\{' => "{{", '\{\%' => "{%")
 
         # Extract tag segments
         markup =
@@ -118,7 +131,7 @@ module Jekyll
 
         # Dynamic image type
         type = "fetch"
-        # TODO: URL2PNG requires signed URLs… need to investigate more
+        # TODO: URL2PNG requires signed URLs... need to investigate more
         # if /^url2png\:/.match(image_src)
         #   type = "url2png"
         #   image_src.gsub! "url2png:", ""
@@ -165,7 +178,7 @@ module Jekyll
         end
 
         # alt and title attributes should go only to the <img> even when there is a caption
-        img_attr = ""
+        img_attr = "".dup
         if html_attr["alt"]
           img_attr << " alt=\"#{html_attr["alt"]}\""
           html_attr.delete("alt")
@@ -174,32 +187,40 @@ module Jekyll
           img_attr << " title=\"#{html_attr["title"]}\""
           html_attr.delete("title")
         end
+        if html_attr["loading"]
+          img_attr << " loading=\"#{html_attr["loading"]}\""
+          html_attr.delete("loading")
+        end
 
         attr_string = html_attr.map { |a, v| "#{a}=\"#{v}\"" }.join(" ")
 
         # Figure out the Cloudinary transformations
         transformations = []
         transformations_string = ""
-        transformation_options.each do | key, shortcode |
+        transformation_options.each do |key, shortcode|
           if preset[key]
             transformations << "#{shortcode}_#{preset[key]}"
           end
         end
-        if transformations.length > 0
-          transformations_string = transformations.compact.reject(&:empty?).join(',') + ","
+        unless transformations.empty?
+          transformations_string = transformations.compact.reject(&:empty?).join(",") + ","
         end
 
         # Build source image URL
-        is_image_remote = /^https?/.match(image_src)
+        is_image_remote = %r!^https?!.match(image_src)
         if is_image_remote
-          # It’s remote
+          # It's remote
           image_dest_path = image_src
           image_dest_url = image_src
           natural_width, natural_height = FastImage.size(image_dest_url)
+          if natural_width.nil?
+            Jekyll.logger.warn("remote url doesn't exists " + image_dest_url)
+            return "<img src=\"#{image_dest_url}\" />"
+          end
           width_height = "width=\"#{natural_width}\" height=\"#{natural_height}\""
           fallback_url = "https://res.cloudinary.com/#{settings["cloud_name"]}/image/#{type}/#{transformations_string}w_#{preset["fallback_max_width"]}/#{image_dest_url}"
         else
-          # It’s a local image
+          # It's a local image
           is_image_src_absolute = %r!^/.*$!.match(image_src)
           if is_image_src_absolute
             image_src_path = File.join(
@@ -212,13 +233,12 @@ module Jekyll
             )
             image_dest_url = File.join(
               url,
-              baseurl,
               image_src
             )
           else
             image_src_path = File.join(
               site.config["source"],
-              File.dirname(context["page"]["path"]),
+              File.dirname(context["page"]["path"].chomp("/#excerpt")),
               image_src
             )
             image_dest_path = File.join(
@@ -228,7 +248,6 @@ module Jekyll
             )
             image_dest_url = File.join(
               url,
-              baseurl,
               File.dirname(context["page"]["url"]),
               image_src
             )
@@ -246,6 +265,11 @@ module Jekyll
             )
             fallback_url = image_dest_url
           end
+        end
+
+        # Don't generate responsive image HTML and Cloudinary URLs for local development
+        if settings["only_prod"] && ENV["JEKYLL_ENV"] != "production"
+          return "<img src=\"#{image_dest_url}\" #{attr_string} #{img_attr} #{width_height} crossorigin=\"anonymous\" />"
         end
 
         srcset = []
@@ -292,7 +316,7 @@ module Jekyll
         if (caption || preset["figure"] == "always") && preset["figure"] != "never"
           "\n<figure #{attr_string}>\n<img src=\"#{fallback_url}\" srcset=\"#{srcset_string}\" sizes=\"#{sizes}\" #{img_attr} #{width_height} />\n<figcaption>#{caption}</figcaption>\n</figure>\n"
         else
-          "<img src=\"#{fallback_url}\" srcset=\"#{srcset_string}\" sizes=\"#{sizes}\" #{attr_string} #{img_attr} />"
+          "<img src=\"#{fallback_url}\" srcset=\"#{srcset_string}\" sizes=\"#{sizes}\" #{attr_string} #{img_attr} crossorigin=\"anonymous\" />"
         end
       end
     end
